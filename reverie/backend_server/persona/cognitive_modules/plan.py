@@ -681,22 +681,32 @@ def _action_keywords(act_desp):
 def compile_action(persona, maze, act_desp, act_world):
   curr_tile = maze.access_tile(persona.scratch.curr_tile)
   keywords = _action_keywords(act_desp)
-  sectors = _as_option_list(persona.s_mem.get_str_accessible_sectors(act_world))
-  sector = _pick_option(sectors, keywords, curr_tile.get("sector"))
-  if globals().get("llm_compile_actions", False) or not sector:
-    sector = generate_action_sector(act_desp, persona, maze)
+  text = str(act_desp or "").lower()
+  is_sleep_action = any(k in text for k in ["sleep", "bed", "rest"])
+  # If a persona starts a sleep/rest action already on a bed tile, keep them
+  # there. Otherwise the generic keyword ranker can choose the first accessible
+  # sector (e.g., Oak Hill College) and make a sleeping avatar walk around.
+  if is_sleep_action and curr_tile.get("game_object") == "bed":
+    sector = curr_tile.get("sector")
+    arena = curr_tile.get("arena")
+    game_object = curr_tile.get("game_object")
+  else:
+    sectors = _as_option_list(persona.s_mem.get_str_accessible_sectors(act_world))
+    sector = _pick_option(sectors, keywords, curr_tile.get("sector"))
+    if globals().get("llm_compile_actions", False) or not sector:
+      sector = generate_action_sector(act_desp, persona, maze)
 
-  arenas = _as_option_list(persona.s_mem.get_str_accessible_sector_arenas(f"{act_world}:{sector}"))
-  arena = _pick_option(arenas, keywords, curr_tile.get("arena"))
-  if globals().get("llm_compile_actions", False) or not arena:
-    arena = generate_action_arena(act_desp, persona, maze, act_world, sector)
+    arenas = _as_option_list(persona.s_mem.get_str_accessible_sector_arenas(f"{act_world}:{sector}"))
+    arena = _pick_option(arenas, keywords, curr_tile.get("arena"))
+    if globals().get("llm_compile_actions", False) or not arena:
+      arena = generate_action_arena(act_desp, persona, maze, act_world, sector)
+
+    objects = _as_option_list(persona.s_mem.get_str_accessible_arena_game_objects(f"{act_world}:{sector}:{arena}"))
+    game_object = _pick_option(objects, keywords) or "<random>"
+    if globals().get("llm_compile_actions", False) and objects:
+      game_object = generate_action_game_object(act_desp, address, persona, maze)
 
   address = f"{act_world}:{sector}:{arena}"
-  objects = _as_option_list(persona.s_mem.get_str_accessible_arena_game_objects(address))
-  game_object = _pick_option(objects, keywords) or "<random>"
-  if globals().get("llm_compile_actions", False) and objects:
-    game_object = generate_action_game_object(act_desp, address, persona, maze)
-
   object_description = normalize_action_description(act_desp)
   return {
     "sector": sector,
