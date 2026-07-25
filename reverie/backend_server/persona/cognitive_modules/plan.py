@@ -74,6 +74,89 @@ def generate_first_daily_plan(persona, wake_up_hour):
   return run_gpt_prompt_daily_plan(persona, wake_up_hour)[0]
 
 
+def _parse_hhmm(value):
+  try:
+    hour, minute = str(value).strip().split(":")[:2]
+    return max(0, min(1439, int(hour) * 60 + int(minute[:2])))
+  except Exception:
+    return None
+
+
+def _compress_minute_blocks(blocks):
+  ret = []
+  for activity, duration in blocks:
+    if duration <= 0:
+      continue
+    activity = normalize_action_description(activity)
+    if ret and ret[-1][0] == activity:
+      ret[-1][1] += duration
+    else:
+      ret.append([activity, duration])
+  total = sum(d for _, d in ret)
+  if total < 1440:
+    ret.append(["sleeping", 1440 - total])
+  elif total > 1440:
+    overflow = total - 1440
+    while overflow > 0 and ret:
+      trim = min(overflow, ret[-1][1])
+      ret[-1][1] -= trim
+      overflow -= trim
+      if ret[-1][1] <= 0:
+        ret.pop()
+  return ret
+
+
+def _repair_daily_schedule(schedule_json, wake_up_hour):
+  blocks = []
+  raw_blocks = (schedule_json or {}).get("blocks", [])
+  for block in raw_blocks:
+    start = _parse_hhmm(block.get("start"))
+    end = _parse_hhmm(block.get("end"))
+    activity = block.get("activity")
+    if start is None or end is None or end <= start or not activity:
+      continue
+    blocks.append((start, end, activity))
+  blocks = sorted(blocks, key=lambda x: x[0])
+
+  repaired = []
+  cursor = 0
+  wake_min = max(0, min(23, int(wake_up_hour))) * 60
+  if wake_min > 0:
+    repaired.append(["sleeping", wake_min])
+    cursor = wake_min
+  for start, end, activity in blocks:
+    if end <= cursor:
+      continue
+    if start > cursor:
+      repaired.append(["resting", start - cursor])
+    repaired.append([activity, end - max(start, cursor)])
+    cursor = end
+  if cursor < 1440:
+    repaired.append(["sleeping", 1440 - cursor])
+  return _compress_minute_blocks(repaired)
+
+
+def generate_structured_daily_schedule(persona, wake_up_hour):
+  prompt = f"""
+Create a plausible one-day schedule for this generative agent as JSON.
+Persona: {persona.scratch.get_str_iss()}
+Lifestyle: {persona.scratch.get_str_lifestyle()}
+Date: {persona.scratch.get_str_curr_date_str()}
+Broad daily plan: {persona.scratch.daily_plan_req}
+Wake hour: {wake_up_hour}:00
+Return exactly this shape:
+{{"wake_time":"HH:MM","blocks":[{{"start":"HH:MM","end":"HH:MM","activity":"short gerund phrase"}}]}}
+Use 24-hour times, ordered non-overlapping blocks, and cover waking activities.
+""".strip()
+  data = safe_json_request(prompt, schema_name="daily_schedule", fail_safe=None)
+  if not data:
+    return None
+  repaired = _repair_daily_schedule(data, wake_up_hour)
+  if sum(i[1] for i in repaired) != 1440:
+    return None
+  return repaired
+
+
 def generate_hourly_schedule(persona, wake_up_hour): 
   """
   Based on the daily req, creates an hourly schedule -- one hour at a time. 
@@ -94,6 +177,14 @@ def generate_hourly_schedule(persona, wake_up_hour):
      ['eating breakfast', 60],..
   """
   if debug: print ("GNS FUNCTION: <generate_hourly_schedule>")
+
+  if globals().get("structured_daily_planning", True):
+    try:
+      structured_schedule = generate_structured_daily_schedule(persona, wake_up_hour)
+      if structured_schedule:
+        return structured_schedule
+    except Exception as e:
+      print("STRUCTURED DAILY PLANNING FAILED", e)
 
   hour_str = ["00:00 AM", "01:00 AM", "02:00 AM", "03:00 AM", "04:00 AM", 
               "05:00 AM", "06:00 AM", "07:00 AM", "08:00 AM", "09:00 AM", 

@@ -372,6 +372,31 @@ def generate_prompt(curr_input, prompt_lib_file):
   return prompt.strip()
 
 
+def _extract_json_object(text):
+  text = str(text or "").strip()
+  start = text.find("{")
+  end = text.rfind("}")
+  if start == -1 or end == -1 or end <= start:
+    raise ValueError("No JSON object found in LLM response")
+  return json.loads(text[start:end+1])
+
+
+def safe_json_request(prompt, schema_name=None, fail_safe=None, repeat=3, verbose=False):
+  json_prompt = prompt
+  if schema_name:
+    json_prompt += f"\nReturn only valid JSON for schema: {schema_name}."
+  for i in range(repeat):
+    try:
+      response = ChatGPT_request(json_prompt)
+      if verbose:
+        print(response)
+      return _extract_json_object(response)
+    except Exception as e:
+      if verbose:
+        print("JSON REQUEST FAILED", i, e)
+  return fail_safe
+
+
 def safe_generate_response(prompt, 
                            gpt_parameter,
                            repeat=5,
