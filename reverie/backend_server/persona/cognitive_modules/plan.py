@@ -701,7 +701,8 @@ def compile_action(persona, maze, act_desp, act_world):
     if globals().get("llm_compile_actions", False) or not arena:
       arena = generate_action_arena(act_desp, persona, maze, act_world, sector)
 
-    objects = _as_option_list(persona.s_mem.get_str_accessible_arena_game_objects(f"{act_world}:{sector}:{arena}"))
+    address = f"{act_world}:{sector}:{arena}"
+    objects = _as_option_list(persona.s_mem.get_str_accessible_arena_game_objects(address))
     game_object = _pick_option(objects, keywords) or "<random>"
     if globals().get("llm_compile_actions", False) and objects:
       game_object = generate_action_game_object(act_desp, address, persona, maze)
