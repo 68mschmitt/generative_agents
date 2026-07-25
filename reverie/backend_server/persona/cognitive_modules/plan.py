@@ -15,6 +15,12 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.retrieve import *
 from persona.cognitive_modules.converse import *
+from persona.cognitive_modules.llm_optimizations import (
+  action_emoji,
+  action_event_triple,
+  object_event_triple,
+  normalize_action_description,
+)
 
 ##############################################################################
 # CHAPTER 2: Generate
@@ -239,6 +245,8 @@ def generate_action_pronunciatio(act_desp, persona):
     "🧈🍞"
   """
   if debug: print ("GNS FUNCTION: <generate_action_pronunciatio>")
+  if not globals().get("llm_generate_emojis", False):
+    return action_emoji(act_desp)
   try: 
     x = run_gpt_prompt_pronunciatio(act_desp, persona)[0]
   except: 
@@ -261,6 +269,8 @@ def generate_action_event_triple(act_desp, persona):
     "🧈🍞"
   """
   if debug: print ("GNS FUNCTION: <generate_action_event_triple>")
+  if not globals().get("llm_generate_event_triples", False):
+    return action_event_triple(persona.scratch.name, act_desp)
   return run_gpt_prompt_event_triple(act_desp, persona)[0]
 
 
@@ -271,6 +281,8 @@ def generate_act_obj_desc(act_game_object, act_desp, persona):
 
 def generate_act_obj_event_triple(act_game_object, act_obj_desc, persona): 
   if debug: print ("GNS FUNCTION: <generate_act_obj_event_triple>")
+  if not globals().get("llm_generate_event_triples", False):
+    return object_event_triple(act_game_object, act_obj_desc)
   return run_gpt_prompt_act_obj_event_triple(act_game_object, act_obj_desc, persona)[0]
 
 

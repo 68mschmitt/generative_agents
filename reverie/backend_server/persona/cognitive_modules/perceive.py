@@ -11,10 +11,13 @@ from operator import itemgetter
 from global_methods import *
 from persona.prompt_template.gpt_structure import *
 from persona.prompt_template.run_gpt_prompt import *
+from persona.cognitive_modules.llm_optimizations import heuristic_poignancy
 
 def generate_poig_score(persona, event_type, description): 
   if "is idle" in description: 
     return 1
+  if not globals().get("llm_score_poignancy", False):
+    return heuristic_poignancy(event_type, description)
 
   if event_type == "event": 
     return run_gpt_prompt_event_poignancy(persona, description)[0]

@@ -17,6 +17,7 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.prompt_template.gpt_structure import *
 from persona.cognitive_modules.retrieve import *
+from persona.cognitive_modules.llm_optimizations import action_event_triple, heuristic_poignancy
 
 def generate_focal_points(persona, n=3): 
   if debug: print ("GNS FUNCTION: <generate_focal_points>")
@@ -67,6 +68,8 @@ def generate_action_event_triple(act_desp, persona):
     "🧈🍞"
   """
   if debug: print ("GNS FUNCTION: <generate_action_event_triple>")
+  if not globals().get("llm_generate_event_triples", False):
+    return action_event_triple(persona.scratch.name, act_desp)
   return run_gpt_prompt_event_triple(act_desp, persona)[0]
 
 
@@ -75,6 +78,8 @@ def generate_poig_score(persona, event_type, description):
 
   if "is idle" in description: 
     return 1
+  if not globals().get("llm_score_poignancy", False):
+    return heuristic_poignancy(event_type, description)
 
   if event_type == "event" or event_type == "thought": 
     return run_gpt_prompt_event_poignancy(persona, description)[0]
