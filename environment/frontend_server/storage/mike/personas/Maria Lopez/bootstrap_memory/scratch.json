@@ -1,0 +1,219 @@
+{
+  "vision_r": 8,
+  "att_bandwidth": 8,
+  "retention": 8,
+  "curr_time": "February 13, 2023, 00:00:00",
+  "curr_tile": [
+    123,
+    57
+  ],
+  "daily_plan_req": "Maria Lopez spends at least 3 hours a day Twitch streaming or gaming.",
+  "name": "Maria Lopez",
+  "first_name": "Maria",
+  "last_name": "Lopez",
+  "age": 21,
+  "innate": "energetic, enthusiastic, inquisitive",
+  "learned": "Maria Lopez is a student at Oak Hill College studying physics and a part time Twitch game streamer who loves to connect with people and explore new ideas.",
+  "currently": "Maria Lopez is working on her physics degree and streaming games on Twitch to make some extra money. She visits Hobbs Cafe for studying and eating just about everyday.",
+  "lifestyle": "Maria Lopez goes to bed around 2am, awakes up around 9am, eats dinner around 6pm. She likes to hang out at Hobbs Cafe if it's before 6pm.",
+  "living_area": "the Ville:Dorm for Oak Hill College:Maria Lopez's room",
+  "concept_forget": 100,
+  "daily_reflection_time": 180,
+  "daily_reflection_size": 5,
+  "overlap_reflect_th": 4,
+  "kw_strg_event_reflect_th": 10,
+  "kw_strg_thought_reflect_th": 9,
+  "recency_w": 1,
+  "relevance_w": 1,
+  "importance_w": 1,
+  "recency_decay": 0.99,
+  "importance_trigger_max": 150,
+  "importance_trigger_curr": 144,
+  "importance_ele_n": 6,
+  "thought_count": 5,
+  "daily_req": [
+    "wake up and complete the morning routine at 8:00 am",
+    "",
+    "stream or play games on Twitch from 1:00 pm to 4:00 pm",
+    "hang out at Hobbs Cafe if needed for further studying or socializing until around 5:30 pm"
+  ],
+  "f_daily_schedule": [
+    [
+      "sleeping",
+      480
+    ],
+    [
+      "waking up and completing her morning routine (washing her face)",
+      5
+    ],
+    [
+      "waking up and completing her morning routine (Maria is taking a shower)",
+      10
+    ],
+    [
+      "waking up and completing her morning routine (Maria is drying and styling her hair)",
+      5
+    ],
+    [
+      "waking up and completing her morning routine (Maria is getting dressed)",
+      5
+    ],
+    [
+      "waking up and completing her morning routine (Maria is packing her bag for the day)",
+      5
+    ],
+    [
+      "waking up and completing her morning routine (Maria is checking her phone and responding to messages)",
+      30
+    ],
+    [
+      "[Monday February 13 -- 09:00 AM] Activity: Maria has breakfast and prepares for the day",
+      60
+    ],
+    [
+      "[Monday February 13 -- 10:00 AM] Activity: Maria studies at Hobbs Cafe, focusing on her physics coursework",
+      60
+    ],
+    [
+      "[Monday February 13 -- 11:00 AM] Activity: Maria studies at Hobbs Cafe, focusing on her physics coursework",
+      60
+    ],
+    [
+      "Having the original intended schedule in mind, let's adjust the hourly breakdown to better reflect Maria Lopez's daily plan and lifestyle:",
+      120
+    ],
+    [
+      "[(ID:ooE4MG) Monday February 13 -- 01:00 PM] Activity: Maria has lunch and prepares for her Twitch stream",
+      60
+    ],
+    [
+      "[(ID:ALKwIt) Monday February 13 -- 03:00 PM] Activity: Maria starts her Twitch stream or plays games",
+      60
+    ],
+    [
+      "[Monday February 13 -- 05:00 PM] Activity: Maria is taking a break and grabbing dinner at Hobbs Cafe",
+      60
+    ],
+    [
+      "[Monday February 13 -- 06:00 PM] Activity: Maria is having dinner at Hobbs Cafe",
+      60
+    ],
+    [
+      "[Monday February 13 -- 07:00 PM] Activity: Maria is spending time with friends or relaxing at Hobbs Cafe before heading home",
+      60
+    ],
+    [
+      "[Monday February 13 -- 08:00 AM] Activity: Maria completes her morning routine",
+      60
+    ],
+    [
+      "[Monday February 13 -- 09:00 PM] Activity: Maria is going home and spending some personal time",
+      60
+    ],
+    [
+      "[Monday February 13 -- 09:00 PM] Activity: Maria is having dinner and spending some personal time at home",
+      60
+    ],
+    [
+      "[Monday February 13 -- 10:00 PM] Activity: Maria is winding down for the night and preparing for bed",
+      60
+    ],
+    [
+      "[Monday February 13 -- 11:00 PM] Activity: Maria is winding down for the night and preparing for bed",
+      60
+    ],
+    [
+      "sleeping",
+      0
+    ]
+  ],
+  "f_daily_schedule_hourly_org": [
+    [
+      "sleeping",
+      480
+    ],
+    [
+      "waking up and completing her morning routine",
+      60
+    ],
+    [
+      "[Monday February 13 -- 09:00 AM] Activity: Maria has breakfast and prepares for the day",
+      60
+    ],
+    [
+      "[Monday February 13 -- 10:00 AM] Activity: Maria studies at Hobbs Cafe, focusing on her physics coursework",
+      60
+    ],
+    [
+      "[Monday February 13 -- 11:00 AM] Activity: Maria studies at Hobbs Cafe, focusing on her physics coursework",
+      60
+    ],
+    [
+      "Having the original intended schedule in mind, let's adjust the hourly breakdown to better reflect Maria Lopez's daily plan and lifestyle:",
+      120
+    ],
+    [
+      "[(ID:ooE4MG) Monday February 13 -- 01:00 PM] Activity: Maria has lunch and prepares for her Twitch stream",
+      60
+    ],
+    [
+      "[(ID:ALKwIt) Monday February 13 -- 03:00 PM] Activity: Maria starts her Twitch stream or plays games",
+      60
+    ],
+    [
+      "[Monday February 13 -- 05:00 PM] Activity: Maria is taking a break and grabbing dinner at Hobbs Cafe",
+      60
+    ],
+    [
+      "[Monday February 13 -- 06:00 PM] Activity: Maria is having dinner at Hobbs Cafe",
+      60
+    ],
+    [
+      "[Monday February 13 -- 07:00 PM] Activity: Maria is spending time with friends or relaxing at Hobbs Cafe before heading home",
+      60
+    ],
+    [
+      "[Monday February 13 -- 08:00 AM] Activity: Maria completes her morning routine",
+      60
+    ],
+    [
+      "[Monday February 13 -- 09:00 PM] Activity: Maria is going home and spending some personal time",
+      60
+    ],
+    [
+      "[Monday February 13 -- 09:00 PM] Activity: Maria is having dinner and spending some personal time at home",
+      60
+    ],
+    [
+      "[Monday February 13 -- 10:00 PM] Activity: Maria is winding down for the night and preparing for bed",
+      60
+    ],
+    [
+      "[Monday February 13 -- 11:00 PM] Activity: Maria is winding down for the night and preparing for bed",
+      60
+    ]
+  ],
+  "act_address": "the Ville:Dorm for Oak Hill College:Maria Lopez's room:bed",
+  "act_start_time": "February 13, 2023, 00:00:00",
+  "act_duration": 480,
+  "act_description": "sleeping",
+  "act_pronunciatio": "\ud83d\ude34",
+  "act_event": [
+    "Maria Lopez",
+    "is",
+    "sleep"
+  ],
+  "act_obj_description": "occupied or being used by Maria Lopez",
+  "act_obj_pronunciatio": "\ud83c\udfe6\ud83d\udcbb",
+  "act_obj_event": [
+    "bed",
+    "be occupied by",
+    "Maria Lopez"
+  ],
+  "chatting_with": null,
+  "chat": null,
+  "chatting_with_buffer": {},
+  "chatting_end_time": null,
+  "act_path_set": true,
+  "planned_path": []
+}

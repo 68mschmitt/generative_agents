@@ -117,7 +117,11 @@ def home(request):
   with open(f_curr_step) as json_file:  
     step = json.load(json_file)["step"]
 
-  os.remove(f_curr_step)
+  # The original demo deletes curr_step after the first browser load as a
+  # one-shot backend-start signal. In local development this makes refreshes or
+  # opening the page twice show "Please start the backend first" even while the
+  # backend is still running, so keep the marker file around.
+  # os.remove(f_curr_step)
 
   persona_names = []
   persona_names_set = set()

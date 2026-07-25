@@ -1,0 +1,27 @@
+# Copy to reverie/backend_server/utils.py and adjust for your machine.
+
+# Use "ollama" for a local Ollama server or "openai" for the original setup.
+llm_provider = "ollama"
+llm_api_base = "http://localhost:11434/v1"  # Ollama OpenAI-compatible endpoint
+
+# Ollama ignores the key but the OpenAI client requires a non-empty value.
+openai_api_key = "ollama"
+key_owner = "local"
+
+# Pull these first, or replace with model names from `ollama list`.
+#   ollama pull mistral:7b
+#   ollama pull nomic-embed-text
+llm_chat_model = "mistral:7b"
+llm_gpt4_model = llm_chat_model
+llm_completion_model = llm_chat_model
+llm_embedding_model = "nomic-embed-text"
+
+maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
+env_matrix = f"{maze_assets_loc}/the_ville/matrix"
+env_visuals = f"{maze_assets_loc}/the_ville/visuals"
+
+fs_storage = "../../environment/frontend_server/storage"
+fs_temp_storage = "../../environment/frontend_server/temp_storage"
+
+collision_block_id = "32125"
+debug = True

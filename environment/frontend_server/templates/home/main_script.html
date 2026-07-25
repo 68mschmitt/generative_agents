@@ -81,6 +81,75 @@
 	let player;
 	let showDebug = false;
 
+	// Camera interaction settings. Mouse wheel zooms the map; click-and-drag
+	// moves the hidden camera target so users can focus on any map area.
+	const cameraZoomMin = 0.15;
+	const cameraZoomMax = 2.0;
+	const cameraZoomStep = 1.15;
+	let isCameraDragging = false;
+	let cameraDragStartPointer;
+	let cameraDragStartPlayer;
+
+	function setCameraTargetPosition(x, y) {
+		if (!player || !player.body) return;
+		const bounds = player.scene.physics.world.bounds;
+		player.setPosition(
+			Phaser.Math.Clamp(x, 0, bounds.width),
+			Phaser.Math.Clamp(y, 0, bounds.height)
+		);
+		player.body.reset(player.x, player.y);
+	}
+
+	function setupCameraControls(scene, camera, map, initialZoom) {
+		camera.setZoom(initialZoom);
+		scene.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+		player.setCollideWorldBounds(true);
+		cameraDragStartPointer = new Phaser.Math.Vector2();
+		cameraDragStartPlayer = new Phaser.Math.Vector2();
+
+		const container = document.getElementById("game-container");
+		const setCursor = (cursor) => { if (container) container.style.cursor = cursor; };
+		if (scene.game.canvas) {
+			scene.game.canvas.addEventListener("wheel", (event) => event.preventDefault(), { passive: false });
+		}
+
+		scene.input.on("wheel", function(pointer, gameObjects, deltaX, deltaY, deltaZ) {
+			const oldZoom = camera.zoom;
+			const newZoom = Phaser.Math.Clamp(
+				deltaY > 0 ? oldZoom / cameraZoomStep : oldZoom * cameraZoomStep,
+				cameraZoomMin,
+				cameraZoomMax
+			);
+			camera.setZoom(newZoom);
+			if (pointer.event) pointer.event.preventDefault();
+		});
+
+		scene.input.on("pointerdown", function(pointer) {
+			if (!pointer.leftButtonDown()) return;
+			isCameraDragging = true;
+			cameraDragStartPointer.set(pointer.x, pointer.y);
+			cameraDragStartPlayer.set(player.x, player.y);
+			setCursor("grabbing");
+			if (pointer.event) pointer.event.preventDefault();
+		});
+
+		scene.input.on("pointermove", function(pointer) {
+			if (!isCameraDragging) return;
+			setCameraTargetPosition(
+				cameraDragStartPlayer.x - ((pointer.x - cameraDragStartPointer.x) / camera.zoom),
+				cameraDragStartPlayer.y - ((pointer.y - cameraDragStartPointer.y) / camera.zoom)
+			);
+		});
+
+		const stopDrag = () => {
+			isCameraDragging = false;
+			setCursor("grab");
+		};
+		scene.input.on("pointerup", stopDrag);
+		scene.input.on("pointerupoutside", stopDrag);
+		scene.game.canvas.addEventListener("mouseleave", stopDrag);
+	}
+
 	// Persona related variables. This should have the name of the persona as its 
 	// keys, and the instances of the Persona class as the values.
 	var spawn_tile_loc = {};
@@ -274,6 +343,9 @@
 	  const camera = this.cameras.main;
 	  camera.startFollow(player);
 	  camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+	  // Show the whole 4480x3200 Smallville map in the 1500x800 viewport.
+	  // Mouse wheel zooms; click-and-drag pans by moving the camera target.
+	  setupCameraControls(this, camera, map, 0.25);
 	  cursors = this.input.keyboard.createCursorKeys();
 
 	  // *** SET UP PERSONAS *** 

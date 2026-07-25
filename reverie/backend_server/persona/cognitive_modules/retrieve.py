@@ -64,6 +64,11 @@ def cos_sim(a, b):
     a = [0.3, 0.2, 0.5]
     b = [0.2, 0.2, 0.5]
   """
+  if len(a) != len(b):
+    # Existing bundled simulations ship with OpenAI ada-002 embeddings (1536d).
+    # Local Ollama embedding models often have a different dimensionality; avoid
+    # crashing retrieval when old and new embeddings are mixed.
+    return 0
   return dot(a, b)/(norm(a)*norm(b))
 
 

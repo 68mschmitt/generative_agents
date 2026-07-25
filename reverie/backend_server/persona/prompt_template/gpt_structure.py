@@ -11,7 +11,39 @@ import time
 
 from utils import *
 
-openai.api_key = openai_api_key
+# Provider configuration is read from reverie/backend_server/utils.py.
+# Defaults keep the original OpenAI behavior, while local Ollama can be enabled
+# by setting llm_provider="ollama" and llm_api_base="http://localhost:11434/v1".
+llm_provider = globals().get("llm_provider", "openai")
+llm_api_base = globals().get("llm_api_base", None)
+llm_chat_model = globals().get("llm_chat_model", "gpt-3.5-turbo")
+llm_gpt4_model = globals().get("llm_gpt4_model", "gpt-4")
+llm_completion_model = globals().get("llm_completion_model", None)
+llm_embedding_model = globals().get("llm_embedding_model", "text-embedding-ada-002")
+
+openai.api_key = globals().get("openai_api_key", "ollama")
+if llm_api_base:
+  openai.api_base = llm_api_base
+
+
+def _chat_model(default_model):
+  if llm_provider == "ollama":
+    # Ollama does not have OpenAI model aliases such as gpt-3.5-turbo/gpt-4.
+    return llm_gpt4_model if default_model == "gpt-4" else llm_chat_model
+  return default_model
+
+
+def _completion_model(default_model):
+  if llm_provider == "ollama":
+    # Route legacy text-davinci/text-curie prompts to the configured Ollama LLM.
+    return llm_completion_model or llm_chat_model
+  return default_model
+
+
+def _embedding_model(default_model):
+  if llm_provider == "ollama":
+    return llm_embedding_model
+  return default_model
 
 def temp_sleep(seconds=0.1):
   time.sleep(seconds)
@@ -20,7 +52,7 @@ def ChatGPT_single_request(prompt):
   temp_sleep()
 
   completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo", 
+    model=_chat_model("gpt-3.5-turbo"), 
     messages=[{"role": "user", "content": prompt}]
   )
   return completion["choices"][0]["message"]["content"]
@@ -46,7 +78,7 @@ def GPT4_request(prompt):
 
   try: 
     completion = openai.ChatCompletion.create(
-    model="gpt-4", 
+    model=_chat_model("gpt-4"), 
     messages=[{"role": "user", "content": prompt}]
     )
     return completion["choices"][0]["message"]["content"]
@@ -71,7 +103,7 @@ def ChatGPT_request(prompt):
   # temp_sleep()
   try: 
     completion = openai.ChatCompletion.create(
-    model="gpt-3.5-turbo", 
+    model=_chat_model("gpt-3.5-turbo"), 
     messages=[{"role": "user", "content": prompt}]
     )
     return completion["choices"][0]["message"]["content"]
@@ -208,8 +240,24 @@ def GPT_request(prompt, gpt_parameter):
   """
   temp_sleep()
   try: 
+    if llm_provider == "ollama":
+      # Ollama's OpenAI-compatible server is much more reliable through the
+      # chat endpoint than the legacy completions endpoint used by this 2023
+      # codebase. Treat old text-davinci-style prompts as one user message.
+      completion = openai.ChatCompletion.create(
+        model=_completion_model(gpt_parameter["engine"]),
+        messages=[{"role": "user", "content": prompt}],
+        temperature=gpt_parameter["temperature"],
+        max_tokens=gpt_parameter["max_tokens"],
+        top_p=gpt_parameter["top_p"],
+        frequency_penalty=gpt_parameter["frequency_penalty"],
+        presence_penalty=gpt_parameter["presence_penalty"],
+        stream=gpt_parameter["stream"],
+        stop=gpt_parameter["stop"],)
+      return completion["choices"][0]["message"]["content"]
+
     response = openai.Completion.create(
-                model=gpt_parameter["engine"],
+                model=_completion_model(gpt_parameter["engine"]),
                 prompt=prompt,
                 temperature=gpt_parameter["temperature"],
                 max_tokens=gpt_parameter["max_tokens"],
@@ -219,9 +267,9 @@ def GPT_request(prompt, gpt_parameter):
                 stream=gpt_parameter["stream"],
                 stop=gpt_parameter["stop"],)
     return response.choices[0].text
-  except: 
-    print ("TOKEN LIMIT EXCEEDED")
-    return "TOKEN LIMIT EXCEEDED"
+  except Exception as e: 
+    print ("LLM REQUEST FAILED", e)
+    return "LLM REQUEST FAILED"
 
 
 def generate_prompt(curr_input, prompt_lib_file): 
@@ -278,7 +326,7 @@ def get_embedding(text, model="text-embedding-ada-002"):
   if not text: 
     text = "this is blank"
   return openai.Embedding.create(
-          input=[text], model=model)['data'][0]['embedding']
+          input=[text], model=_embedding_model(model))['data'][0]['embedding']
 
 
 if __name__ == '__main__':

@@ -361,22 +361,24 @@ def run_gpt_prompt_task_decomp(persona,
     print (gpt_response)
     print ("-==- -==- -==- ")
 
-    # TODO SOMETHING HERE sometimes fails... See screenshot
-    temp = [i.strip() for i in gpt_response.split("\n")]
-    _cr = []
+    # Ollama/local models often format the same answer slightly differently
+    # than text-davinci did, e.g. `1) task (duration in minutes: 5)` instead
+    # of `task (duration in minutes: 5, ...)`. Parse both robustly.
+    temp = [i.strip() for i in gpt_response.split("\n") if i.strip()]
     cr = []
-    for count, i in enumerate(temp): 
-      if count != 0: 
-        _cr += [" ".join([j.strip () for j in i.split(" ")][3:])]
-      else: 
-        _cr += [i]
-    for count, i in enumerate(_cr): 
-      k = [j.strip() for j in i.split("(duration in minutes:")]
-      task = k[0]
-      if task[-1] == ".": 
+    for i in temp:
+      m = re.search(r"\(duration in minutes:\s*(\d+)", i)
+      if not m:
+        continue
+      task = i[:m.start()].strip()
+      task = re.sub(r"^\d+[\).]\s*", "", task).strip()
+      if task and task[-1] == ".": 
         task = task[:-1]
-      duration = int(k[1].split(",")[0].strip())
+      duration = int(m.group(1))
       cr += [[task, duration]]
+
+    if not cr:
+      raise ValueError(f"Could not parse task decomposition: {gpt_response}")
 
     total_expected_min = int(prompt.split("(total duration in minutes")[-1]
                                    .split("):")[0].strip())
@@ -414,16 +416,14 @@ def run_gpt_prompt_task_decomp(persona,
     return cr
 
   def __func_validate(gpt_response, prompt=""): 
-    # TODO -- this sometimes generates error 
     try: 
-      __func_clean_up(gpt_response)
+      __func_clean_up(gpt_response, prompt=prompt)
     except: 
-      pass
-      # return False
-    return gpt_response
+      return False
+    return True
 
   def get_fail_safe(): 
-    fs = ["asleep"]
+    fs = [[task, duration]]
     return fs
 
   gpt_param = {"engine": "text-davinci-003", "max_tokens": 1000, 
@@ -695,9 +695,24 @@ def run_gpt_prompt_action_arena(action_description,
       return False
     return True
   
+  def get_accessible_arenas():
+    x = f"{act_world}:{act_sector}"
+    arenas = [i.strip() for i in persona.s_mem.get_str_accessible_sector_arenas(x).split(",")]
+    arenas = [i for i in arenas if i]
+    fin_arenas = []
+    for i in arenas:
+      if "'s room" in i:
+        if persona.scratch.last_name in i:
+          fin_arenas += [i]
+      else:
+        fin_arenas += [i]
+    return fin_arenas or arenas
+
   def get_fail_safe(): 
-    fs = ("kitchen")
-    return fs
+    arenas = get_accessible_arenas()
+    if maze.access_tile(persona.scratch.curr_tile)["arena"] in arenas:
+      return maze.access_tile(persona.scratch.curr_tile)["arena"]
+    return arenas[0]
 
   gpt_param = {"engine": "text-davinci-003", "max_tokens": 15, 
                "temperature": 0, "top_p": 1, "stream": False,
@@ -710,10 +725,9 @@ def run_gpt_prompt_action_arena(action_description,
   output = safe_generate_response(prompt, gpt_param, 5, fail_safe,
                                    __func_validate, __func_clean_up)
   print (output)
-  # y = f"{act_world}:{act_sector}"
-  # x = [i.strip() for i in persona.s_mem.get_str_accessible_sector_arenas(y).split(",")]
-  # if output not in x: 
-  #   output = random.choice(x)
+  x = get_accessible_arenas()
+  if output not in x: 
+    output = fail_safe
 
   if debug or verbose: 
     print_run_prompts(prompt_template, persona, gpt_param, 

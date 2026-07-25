@@ -12,7 +12,18 @@ This repository accompanies our research paper titled "[Generative Agents: Inter
 To set up your environment, you will need to generate a `utils.py` file that contains your OpenAI API key and download the necessary packages.
 
 ### Step 1. Generate Utils File
-In the `reverie/backend_server` folder (where `reverie.py` is located), create a new file titled `utils.py` and copy and paste the content below into the file:
+
+For a local Ollama server, this project now includes `reverie/backend_server/utils.py.example`. Copy it to `utils.py`, then make sure the configured models are pulled locally:
+
+```bash
+cp reverie/backend_server/utils.py.example reverie/backend_server/utils.py
+ollama pull mistral:7b
+ollama pull nomic-embed-text
+```
+
+The default Ollama endpoint is `http://localhost:11434/v1`. Edit `llm_chat_model` and `llm_embedding_model` in `utils.py` if you want different local models.
+
+For the original OpenAI setup, in the `reverie/backend_server` folder (where `reverie.py` is located), create a new file titled `utils.py` and copy and paste the content below into the file:
 ```
 # Copy and paste your OpenAI API Key
 openai_api_key = "<Your OpenAI API>"
