@@ -19,6 +19,60 @@ from persona.cognitive_modules.retrieve import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.llm_optimizations import action_event_triple, heuristic_poignancy
 
+_relationship_summary_cache = {}
+
+def _nodes_to_text(retrieved):
+  lines = []
+  for key, val in retrieved.items():
+    for node in val:
+      lines.append(getattr(node, "embedding_key", str(node)))
+  return "\n".join(lines[:40])
+
+
+def _cached_relationship_summary(persona, target_persona, retrieved):
+  key = (persona.scratch.name, target_persona.scratch.name)
+  evidence = _nodes_to_text(retrieved)
+  cached = _relationship_summary_cache.get(key)
+  if cached and cached.get("evidence") == evidence:
+    return cached["summary"]
+  summary = generate_summarize_agent_relationship(persona, target_persona, retrieved)
+  _relationship_summary_cache[key] = {"summary": summary, "evidence": evidence, "updated_at": str(persona.scratch.curr_time)}
+  return summary
+
+
+def generate_batched_conversation(maze, init_persona, target_persona):
+  context = (f"{init_persona.scratch.name} was {init_persona.scratch.act_description} "
+             f"when seeing {target_persona.scratch.name}, who was "
+             f"{target_persona.scratch.act_description}.")
+  retrieved_init = new_retrieve(init_persona, [target_persona.scratch.name], 30)
+  retrieved_target = new_retrieve(target_persona, [init_persona.scratch.name], 30)
+  init_rel = _cached_relationship_summary(init_persona, target_persona, retrieved_init)
+  target_rel = _cached_relationship_summary(target_persona, init_persona, retrieved_target)
+  prompt = f"""
+Generate a short natural conversation as JSON.
+Context: {context}
+{init_persona.scratch.name}'s relationship/context for {target_persona.scratch.name}: {init_rel}
+{target_persona.scratch.name}'s relationship/context for {init_persona.scratch.name}: {target_rel}
+Relevant memories for {init_persona.scratch.name}: {_nodes_to_text(retrieved_init)}
+Relevant memories for {target_persona.scratch.name}: {_nodes_to_text(retrieved_target)}
+Return exactly: {{"turns":[{{"speaker":"{init_persona.scratch.name}","utterance":"..."}}],"summary":"...","ended_naturally":true,"memory_notes":[]}}
+Use 4-8 total turns. Speakers must be exactly {init_persona.scratch.name} or {target_persona.scratch.name}.
+""".strip()
+  data = safe_json_request(prompt, schema_name="batched_conversation", fail_safe=None)
+  if not data or "turns" not in data:
+    return None
+  allowed = set([init_persona.scratch.name, target_persona.scratch.name])
+  turns = []
+  for turn in data.get("turns", [])[:8]:
+    speaker = turn.get("speaker")
+    utt = str(turn.get("utterance", "")).strip()
+    if speaker in allowed and utt:
+      turns.append([speaker, utt])
+  if not turns:
+    return None
+  return {"turns": turns, "summary": data.get("summary", ""), "ended_naturally": data.get("ended_naturally", True)}
+
+
 def generate_agent_chat_summarize_ideas(init_persona, 
                                         target_persona, 
                                         retrieved, 

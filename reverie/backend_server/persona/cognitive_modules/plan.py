@@ -380,9 +380,23 @@ def generate_act_obj_event_triple(act_game_object, act_obj_desc, persona):
 def generate_convo(maze, init_persona, target_persona): 
   curr_loc = maze.access_tile(init_persona.scratch.curr_tile)
 
+  convo_summary = None
   # convo = run_gpt_prompt_create_conversation(init_persona, target_persona, curr_loc)[0]
   # convo = agent_chat_v1(maze, init_persona, target_persona)
-  convo = agent_chat_v2(maze, init_persona, target_persona)
+  if globals().get("batched_conversations", True):
+    try:
+      batched = generate_batched_conversation(maze, init_persona, target_persona)
+      if batched:
+        convo = batched["turns"]
+        convo_summary = batched.get("summary")
+      else:
+        convo = agent_chat_v2(maze, init_persona, target_persona)
+    except Exception as e:
+      print("BATCHED CONVERSATION FAILED", e)
+      convo = agent_chat_v2(maze, init_persona, target_persona)
+  else:
+    convo = agent_chat_v2(maze, init_persona, target_persona)
+  setattr(init_persona.scratch, "_last_convo_summary", convo_summary)
   all_utt = ""
 
   for row in convo: 
@@ -397,6 +411,10 @@ def generate_convo(maze, init_persona, target_persona):
 
 
 def generate_convo_summary(persona, convo): 
+  cached_summary = getattr(persona.scratch, "_last_convo_summary", None)
+  if cached_summary:
+    setattr(persona.scratch, "_last_convo_summary", None)
+    return cached_summary
   convo_summary = run_gpt_prompt_summarize_conversation(persona, convo)[0]
   return convo_summary
 
