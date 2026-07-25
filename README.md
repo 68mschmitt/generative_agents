@@ -8,6 +8,8 @@
 
 This repository accompanies our research paper titled "[Generative Agents: Interactive Simulacra of Human Behavior](https://arxiv.org/abs/2304.03442)." It contains our core simulation module for  generative agents—computational agents that simulate believable human behaviors—and their game environment. Below, we document the steps for setting up the simulation environment on your local machine and for replaying the simulation as a demo animation.
 
+This fork includes a modernized LLM interaction layer: optional JSONL tracing, prompt and embedding caches, deterministic helpers for emojis/event triples/poignancy, compiled action grounding, structured daily planning, batched conversations, and structured reflection fallbacks. See `docs/llm_modernization.md` for provider setup and feature flags.
+
 ## <img src="https://joonsungpark.s3.amazonaws.com:443/static/assets/characters/profile/Isabella_Rodriguez.png" alt="Generative Isabella">   Setting Up the Environment 
 To set up your environment, you will need to generate a `utils.py` file that contains your OpenAI API key and download the necessary packages.
 

@@ -16,6 +16,26 @@ llm_gpt4_model = llm_chat_model
 llm_completion_model = llm_chat_model
 llm_embedding_model = "nomic-embed-text"
 
+# Optional tracing and caches. Tracing is off by default and writes JSONL only
+# when enabled.
+llm_trace_enabled = False
+llm_trace_path = "llm_trace.jsonl"
+llm_embedding_cache_path = None
+
+# Modern LLM architecture flags. Defaults reduce hot-path micro-calls while
+# preserving legacy fallbacks for comparison/debugging.
+llm_generate_emojis = False
+llm_generate_event_triples = False
+llm_score_poignancy = False
+llm_compile_actions = False
+structured_daily_planning = True
+batched_conversations = True
+structured_reflection = True
+
+# Optional model routing aliases for future prompt tiers.
+llm_fast_model = llm_chat_model
+llm_reasoning_model = llm_gpt4_model
+
 maze_assets_loc = "../../environment/frontend_server/static_dirs/assets"
 env_matrix = f"{maze_assets_loc}/the_ville/matrix"
 env_visuals = f"{maze_assets_loc}/the_ville/visuals"
