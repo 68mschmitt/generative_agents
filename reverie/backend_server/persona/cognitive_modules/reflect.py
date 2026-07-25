@@ -17,7 +17,7 @@ from global_methods import *
 from persona.prompt_template.run_gpt_prompt import *
 from persona.prompt_template.gpt_structure import *
 from persona.cognitive_modules.retrieve import *
-from persona.cognitive_modules.llm_optimizations import action_event_triple, heuristic_poignancy
+from persona.cognitive_modules.llm_optimizations import action_event_triple, heuristic_poignancy, normalize_action_description
 
 def generate_focal_points(persona, n=3): 
   if debug: print ("GNS FUNCTION: <generate_focal_points>")
@@ -43,6 +43,36 @@ def generate_insights_and_evidence(persona, nodes, n=5):
   for count, node in enumerate(nodes): 
     statements += f'{str(count)}. {node.embedding_key}\n'
 
+  if globals().get("structured_reflection", True):
+    prompt = f"""
+Given these memory statements for {persona.scratch.name}, produce reflective insights as JSON.
+Statements:
+{statements}
+Return exactly: {{"focal_points":[],"insights":[{{"thought":"...","evidence_indices":[0],"importance":6,"event":{{"subject":"{persona.scratch.name}","predicate":"is","object":"..."}}}}]}}
+Produce at most {n} insights. Importance is 1-10.
+""".strip()
+    data = safe_json_request(prompt, schema_name="reflection_insights", fail_safe=None)
+    if data and data.get("insights"):
+      ret = {}
+      for item in data.get("insights", [])[:n]:
+        thought = str(item.get("thought", "")).strip()
+        if not thought:
+          continue
+        evidence = []
+        for idx in item.get("evidence_indices", []):
+          try:
+            evidence.append(nodes[int(idx)].node_id)
+          except Exception:
+            pass
+        event = item.get("event") or {}
+        try:
+          importance = max(1, min(10, int(item.get("importance", heuristic_poignancy("thought", thought)))))
+        except Exception:
+          importance = heuristic_poignancy("thought", thought)
+        ret[thought] = {"evidence": evidence, "importance": importance, "event": event}
+      if ret:
+        return ret
+
   ret = run_gpt_prompt_insight_and_guidance(persona, statements, n)[0]
 
   print (ret)
@@ -50,10 +80,10 @@ def generate_insights_and_evidence(persona, nodes, n=5):
 
     for thought, evi_raw in ret.items(): 
       evidence_node_id = [nodes[i].node_id for i in evi_raw]
-      ret[thought] = evidence_node_id
+      ret[thought] = {"evidence": evidence_node_id}
     return ret
   except: 
-    return {"this is blank": "node_1"} 
+    return {"this is blank": {"evidence": ["node_1"]}} 
 
 
 def generate_action_event_triple(act_desp, persona): 
@@ -124,12 +154,17 @@ def run_reflect(persona):
     for xxx in xx: print (xxx)
 
     thoughts = generate_insights_and_evidence(persona, nodes, 5)
-    for thought, evidence in thoughts.items(): 
+    for thought, metadata in thoughts.items(): 
       created = persona.scratch.curr_time
       expiration = persona.scratch.curr_time + datetime.timedelta(days=30)
-      s, p, o = generate_action_event_triple(thought, persona)
+      metadata = metadata if isinstance(metadata, dict) else {"evidence": metadata}
+      event = metadata.get("event") or {}
+      s = event.get("subject") or persona.scratch.name
+      p = event.get("predicate") or "is"
+      o = event.get("object") or normalize_action_description(thought)
       keywords = set([s, p, o])
-      thought_poignancy = generate_poig_score(persona, "thought", thought)
+      thought_poignancy = metadata.get("importance") or generate_poig_score(persona, "thought", thought)
+      evidence = metadata.get("evidence") or []
       thought_embedding_pair = (thought, get_embedding(thought))
 
       persona.a_mem.add_thought(created, expiration, s, p, o, 
