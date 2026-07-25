@@ -530,6 +530,78 @@ def _long_term_planning(persona, new_day):
 
 
 
+def _as_option_list(accessible):
+  if not accessible:
+    return []
+  if isinstance(accessible, str):
+    return [i.strip() for i in accessible.split(",") if i.strip()]
+  return list(accessible)
+
+
+def _pick_option(options, keywords, current=None):
+  if not options:
+    return None
+  normalized = [(o, str(o).lower()) for o in options]
+  if current and current in options:
+    curr = str(current).lower()
+    if any(k in curr for k in keywords):
+      return current
+  for option, lower in normalized:
+    if any(k in lower for k in keywords):
+      return option
+  return options[0]
+
+
+def _action_keywords(act_desp):
+  text = str(act_desp or "").lower()
+  if any(k in text for k in ["sleep", "bed", "rest"]):
+    return ["bedroom", "bed", "home", "house", "apartment"]
+  if any(k in text for k in ["eat", "breakfast", "lunch", "dinner", "cook", "food"]):
+    return ["kitchen", "cafe", "restaurant", "dining", "table", "fridge"]
+  if any(k in text for k in ["paint", "art", "draw"]):
+    return ["studio", "easel", "canvas", "art"]
+  if any(k in text for k in ["read", "study", "write", "work"]):
+    return ["office", "library", "desk", "table", "computer"]
+  if any(k in text for k in ["clean", "shower", "bathroom"]):
+    return ["bathroom", "shower", "sink"]
+  if any(k in text for k in ["talk", "chat", "conversation"]):
+    return ["common", "living", "cafe", "table"]
+  return []
+
+
+def compile_action(persona, maze, act_desp, act_world):
+  curr_tile = maze.access_tile(persona.scratch.curr_tile)
+  keywords = _action_keywords(act_desp)
+  sectors = _as_option_list(persona.s_mem.get_str_accessible_sectors(act_world))
+  sector = _pick_option(sectors, keywords, curr_tile.get("sector"))
+  if globals().get("llm_compile_actions", False) or not sector:
+    sector = generate_action_sector(act_desp, persona, maze)
+
+  arenas = _as_option_list(persona.s_mem.get_str_accessible_sector_arenas(f"{act_world}:{sector}"))
+  arena = _pick_option(arenas, keywords, curr_tile.get("arena"))
+  if globals().get("llm_compile_actions", False) or not arena:
+    arena = generate_action_arena(act_desp, persona, maze, act_world, sector)
+
+  address = f"{act_world}:{sector}:{arena}"
+  objects = _as_option_list(persona.s_mem.get_str_accessible_arena_game_objects(address))
+  game_object = _pick_option(objects, keywords) or "<random>"
+  if globals().get("llm_compile_actions", False) and objects:
+    game_object = generate_action_game_object(act_desp, address, persona, maze)
+
+  object_description = normalize_action_description(act_desp)
+  return {
+    "sector": sector,
+    "arena": arena,
+    "game_object": game_object,
+    "address": f"{address}:{game_object}",
+    "action_emoji": generate_action_pronunciatio(act_desp, persona),
+    "event": generate_action_event_triple(act_desp, persona),
+    "object_description": object_description,
+    "object_emoji": generate_action_pronunciatio(object_description, persona),
+    "object_event": generate_act_obj_event_triple(game_object, object_description, persona),
+  }
+
+
 def _determine_action(persona, maze): 
   """
   Creates the next action sequence for the persona. 
@@ -632,36 +704,24 @@ def _determine_action(persona, maze):
 
 
   # Finding the target location of the action and creating action-related
-  # variables.
+  # variables. compile_action is deterministic-first and avoids the historical
+  # sector/arena/object/emoji/triple micro-call fanout by default.
   act_world = maze.access_tile(persona.scratch.curr_tile)["world"]
-  # act_sector = maze.access_tile(persona.scratch.curr_tile)["sector"]
-  act_sector = generate_action_sector(act_desp, persona, maze)
-  act_arena = generate_action_arena(act_desp, persona, maze, act_world, act_sector)
-  act_address = f"{act_world}:{act_sector}:{act_arena}"
-  act_game_object = generate_action_game_object(act_desp, act_address,
-                                                persona, maze)
-  new_address = f"{act_world}:{act_sector}:{act_arena}:{act_game_object}"
-  act_pron = generate_action_pronunciatio(act_desp, persona)
-  act_event = generate_action_event_triple(act_desp, persona)
-  # Persona's actions also influence the object states. We set those up here. 
-  act_obj_desp = generate_act_obj_desc(act_game_object, act_desp, persona)
-  act_obj_pron = generate_action_pronunciatio(act_obj_desp, persona)
-  act_obj_event = generate_act_obj_event_triple(act_game_object, 
-                                                act_obj_desp, persona)
+  compiled_action = compile_action(persona, maze, act_desp, act_world)
 
   # Adding the action to persona's queue. 
-  persona.scratch.add_new_action(new_address, 
+  persona.scratch.add_new_action(compiled_action["address"], 
                                  int(act_dura), 
                                  act_desp, 
-                                 act_pron, 
-                                 act_event,
+                                 compiled_action["action_emoji"], 
+                                 compiled_action["event"],
                                  None,
                                  None,
                                  None,
                                  None,
-                                 act_obj_desp, 
-                                 act_obj_pron, 
-                                 act_obj_event)
+                                 compiled_action["object_description"], 
+                                 compiled_action["object_emoji"], 
+                                 compiled_action["object_event"])
 
 
 def _choose_retrieved(persona, retrieved): 
