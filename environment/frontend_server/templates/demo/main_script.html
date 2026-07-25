@@ -21,15 +21,17 @@
 	// <step> -- one full loop around all three phases determined by <phase> is 
 	// a step. We use this to link the steps in the backend. 
 	let step = {{step}};
+	const initial_step = step;
 	let sim_code = "{{sim_code}}";
  	let step_size = {{sec_per_step}} * 1000; // 10 seconds = 10000
 
 	// Phaser 3.0 global settings. 
 	// Configuration meant to be passed to the main Phaser game instance. 
+	const game_container = document.getElementById("game-container");
 	const config = {
 	  type: Phaser.AUTO,
-	  width: 1500,
-	  height: 800,
+	  width: game_container.clientWidth,
+	  height: game_container.clientHeight,
 	  parent: "game-container",
 	  pixelArt: true,
 	  physics: {
@@ -39,8 +41,7 @@
 	  scene: {
 	    preload: preload,
 	    create: create,
-	    update: update },
-	  scale: {zoom: 0.8} };
+	    update: update } };
 
 	// const config = {
 	//   type: Phaser.AUTO,
@@ -62,6 +63,9 @@
 	// Creating the game instance and setting up the main Phaser variables that  
 	// will be used in it. 
 	const game = new Phaser.Game(config);
+	window.addEventListener('resize', function() {
+		game.scale.resize(game_container.clientWidth, game_container.clientHeight);
+	});
 	let cursors;
 	let player;
 
@@ -154,6 +158,58 @@
 	// Important: tile_width % movement_speed has to be 0. 
 	// <movement_speed> determines how fast we move at each upate cylce. 
 	let movement_speed = {{play_speed}}; 
+	const default_movement_speed = movement_speed;
+	const movement_speed_options = [1, 2, 4, 8, 16, 32];
+
+	function refreshSpeedIndicator() {
+		if (speed_indicator) speed_indicator.innerHTML = movement_speed + "x";
+	}
+
+	function setMovementSpeed(new_speed) {
+		let old_execute_count_max = execute_count_max;
+		movement_speed = new_speed;
+		execute_count_max = tile_width / movement_speed;
+		if (old_execute_count_max && execute_count > 0) {
+			execute_count = Math.max(1, Math.ceil(execute_count * execute_count_max / old_execute_count_max));
+		}
+		refreshSpeedIndicator();
+	}
+
+	function adjustMovementSpeed(direction) {
+		let speed_index = movement_speed_options.indexOf(movement_speed);
+		if (speed_index < 0) speed_index = movement_speed_options.indexOf(default_movement_speed);
+		speed_index = Math.min(movement_speed_options.length - 1, Math.max(0, speed_index + direction));
+		setMovementSpeed(movement_speed_options[speed_index]);
+	}
+
+	function moveToward(current, target) {
+		if (current < target) return Math.min(current + movement_speed, target);
+		if (current > target) return Math.max(current - movement_speed, target);
+		return current;
+	}
+
+	function refreshTimeSlider() {
+		if (!time_slider) return;
+		time_slider.value = step;
+		if (time_slider_value) time_slider_value.innerHTML = step;
+	}
+
+	function setupTimeControls(play_context) {
+		play_button.onclick = function(){ play_context.scene.resume(); };
+		pause_button.onclick = function(){ play_context.scene.pause(); };
+		slower_button.onclick = function(){ adjustMovementSpeed(-1); };
+		faster_button.onclick = function(){ adjustMovementSpeed(1); };
+		normal_speed_button.onclick = function(){ setMovementSpeed(default_movement_speed); };
+		skip_step_button.onclick = function(){
+			if (execute_count < execute_count_max) execute_count = Math.min(execute_count, 1);
+		};
+		if (time_slider) {
+			time_slider.oninput = function(){ time_slider_value.innerHTML = this.value; };
+			time_slider.onchange = function(){ seekToStep(parseInt(this.value), play_context); };
+		}
+		refreshSpeedIndicator();
+		refreshTimeSlider();
+	}
 
 	// Variables for storing movements that are sent from the backend server.
 	let execute_count_max = tile_width/movement_speed;
@@ -162,9 +218,66 @@
 	let all_movement = {{ all_movement|safe }};
 
   let start_datetime =new Date(Date.parse("{{start_datetime}}"));
+  const initial_start_datetime = new Date(start_datetime.getTime());
   var datetime_options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
  	document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
  	
+	function updateDemoClock() {
+		start_datetime = new Date(initial_start_datetime.getTime() + ((step - initial_step) * step_size));
+ 		document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
+	}
+
+	function updatePersonaPanel(curr_persona_name, movement_info) {
+		if (!movement_info) return;
+		let pronunciatio_content = movement_info["pronunciatio"];
+		let description_content = movement_info["description"] || "@";
+		let chat_content_raw = movement_info["chat"];
+		let chat_content = "";
+		if (chat_content_raw != null) {
+			for (let j=0; j<chat_content_raw.length; j++) {
+				chat_content += chat_content_raw[j][0] + ": " + chat_content_raw[j][1] + "<br>";
+			}
+		} else {
+			chat_content = "<em>None at the moment</em>";
+		}
+		let rgx = new RegExp(/(\p{L}{1})\p{L}+/, 'gu');
+		let initials = [...curr_persona_name.matchAll(rgx)] || [];
+		initials = ((initials.shift()?.[1] || '') + (initials.pop()?.[1] || '')).toUpperCase();
+		pronunciatios[curr_persona_name].setText(initials + ": " + pronunciatio_content);
+		document.getElementById("quick_emoji-"+curr_persona_name).innerHTML = pronunciatio_content;
+		document.getElementById("current_action__"+curr_persona_name).innerHTML = description_content.split("@")[0];
+		document.getElementById("target_address__"+curr_persona_name).innerHTML = description_content.split("@")[1] || "";
+		document.getElementById("chat__"+curr_persona_name).innerHTML = chat_content;
+	}
+
+	function seekToStep(target_step, play_context) {
+		if (play_context) play_context.scene.pause();
+		step = target_step;
+		execute_count = execute_count_max;
+		movement_target = {};
+		for (let i=0; i<Object.keys(personas).length; i++) {
+			let curr_persona_name = Object.keys(personas)[i];
+			let lookup_name = curr_persona_name.replace("_", " ");
+			let latest_movement = null;
+			for (let s=initial_step; s<=target_step; s++) {
+				if (all_movement[s] && all_movement[s][lookup_name]) latest_movement = all_movement[s][lookup_name];
+			}
+			if (latest_movement) {
+				let curr_persona = personas[curr_persona_name];
+				curr_persona.body.x = latest_movement["movement"][0] * tile_width;
+				curr_persona.body.y = latest_movement["movement"][1] * tile_width;
+				movement_target[curr_persona_name] = [curr_persona.body.x, curr_persona.body.y];
+				pronunciatios[curr_persona_name].x = curr_persona.body.x + 18;
+				pronunciatios[curr_persona_name].y = curr_persona.body.y - 42 - 25;
+				speech_bubbles[curr_persona_name].x = curr_persona.body.x + 80;
+				speech_bubbles[curr_persona_name].y = curr_persona.body.y - 39;
+				curr_persona.anims.stop();
+				updatePersonaPanel(curr_persona_name, latest_movement);
+			}
+		}
+		updateDemoClock();
+		refreshTimeSlider();
+	}
 
 	// ###########################################################################
 	// ENGINE
@@ -329,6 +442,7 @@
 	  camera.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
 	  setupCameraControls(this, camera, map, 1.0);
 	  cursors = this.input.keyboard.createCursorKeys();
+	  setupTimeControls(this);
 
 	  // *** SET UP PERSONAS *** 
 	  // We start by creating the game sprite objects. 
@@ -402,21 +516,6 @@
 
 
 	function update(time, delta) {
-		// *** SETUP PLAY AND PAUSE BUTTON *** 
-		let play_context = this;
-		function game_resume() {  
-			play_context.scene.resume();
-		}  
-		play_button.onclick = function(){
-			game_resume();
-		};
-		function game_pause() {  
-			play_context.scene.pause();
-		}  
-		pause_button.onclick = function(){
-			game_pause();
-		};
-
 	  // *** MOVE CAMERA *** 
 	  // This is where we finish up the camera setting we started in the create() 
 	  // function. We set the movement speed of the camera and wire up the keys to
@@ -492,22 +591,22 @@
 
     		if (execute_count > 0) {
     			if (curr_persona.body.x < movement_target[curr_persona_name][0]) {
-	          curr_persona.body.x += movement_speed; 
+	          curr_persona.body.x = moveToward(curr_persona.body.x, movement_target[curr_persona_name][0]); 
 	          anims_direction = "r";
 	          pre_anims_direction = "r"
 	          pre_anims_direction_dict[curr_persona_name] = "r"
 	        } else if (curr_persona.body.x > movement_target[curr_persona_name][0]) {
-	          curr_persona.body.x -= movement_speed; 
+	          curr_persona.body.x = moveToward(curr_persona.body.x, movement_target[curr_persona_name][0]); 
 	          anims_direction = "l";
 	          pre_anims_direction = "l"
 	          pre_anims_direction_dict[curr_persona_name] = "l"
 	        } else if (curr_persona.body.y < movement_target[curr_persona_name][1]) {
-	          curr_persona.body.y += movement_speed;
+	          curr_persona.body.y = moveToward(curr_persona.body.y, movement_target[curr_persona_name][1]);
 	          anims_direction = "d";
 	          pre_anims_direction = "d"
 	          pre_anims_direction_dict[curr_persona_name] = "d"
 	        } else if (curr_persona.body.y > movement_target[curr_persona_name][1]) {
-	          curr_persona.body.y -= movement_speed;
+	          curr_persona.body.y = moveToward(curr_persona.body.y, movement_target[curr_persona_name][1]);
 	          anims_direction = "u";
 	          pre_anims_direction = "u"
 	          pre_anims_direction_dict[curr_persona_name] = "u"
@@ -554,8 +653,8 @@
 			execute_count = execute_count_max + 1;
 	    step = step + 1;
 
-	    start_datetime = new Date(start_datetime.getTime() + step_size);
- 			document.getElementById("game-time-content").innerHTML = start_datetime.toLocaleTimeString("en-US", datetime_options);
+	    updateDemoClock();
+ 			refreshTimeSlider();
     }
 
 	  execute_count -= 1;
@@ -564,6 +663,13 @@
 	// Control button binders
 	var play_button=document.getElementById("play_button");
 	var pause_button=document.getElementById("pause_button");
+	var slower_button=document.getElementById("slower_button");
+	var faster_button=document.getElementById("faster_button");
+	var normal_speed_button=document.getElementById("normal_speed_button");
+	var skip_step_button=document.getElementById("skip_step_button");
+	var speed_indicator=document.getElementById("speed_indicator");
+	var time_slider=document.getElementById("time_slider");
+	var time_slider_value=document.getElementById("time_slider_value");
 </script>
 
 

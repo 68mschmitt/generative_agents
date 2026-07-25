@@ -2,107 +2,60 @@
 {% load staticfiles %}
 
 {% block content %}
-<br>
-<br>
-<div>
+<div class="reverie-layout">
+	<div class="reverie-map-pane">
+		<div id="game-container" title="Mouse wheel: zoom. Click and drag: pan the map."></div>
+	</div>
 
-	<div id="game-container" style="text-align: center; touch-action: none; cursor: grab" title="Mouse wheel: zoom. Click and drag: pan the map."></div>
-
-	<div style="width:55%; margin: 0 auto; margin-top:4.5em">
-		<h3 style="margin-bottom:1.5em; font-size:1.5em"><em>This is a pre-computed replay of a simulation that accompanies the paper entitled "Generative Agents: Interactive Simulacra of Human Behavior." It is for demonstration purposes only.</em></h3>
-
-		
-		<h3 style="margin-bottom:-0.5em; font-size:1.5em">Current Time:</h3>
-		<div class="row">
-			<div class="col-md-8" id="game-time" style="">
-				<h2><span id="game-time-content"></span></h2> 
-			</div>
-			<div class="col-md-4">
-				<h2 style="text-align: right; {% if mode == 'simulate' %} display: none {% endif %}">
-					<button id="play_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong>
-				  </button>
-				  
-				  <button id="pause_button" type="button" class="btn btn-default">
-				    <strong style=" font-size:1.2em"><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong>
-				  </button>
-				</h2>
-			</div>
+	<div class="reverie-side-pane">
+		<div class="demo-note-card">
+			<em>This is a pre-computed replay of a simulation that accompanies the paper entitled "Generative Agents: Interactive Simulacra of Human Behavior." It is for demonstration purposes only.</em>
 		</div>
 
-		<br>
-		<hr style="border-color:#999999">
-		<br>
+		<div class="time-control-card">
+			<h3>Current Time</h3>
+			<div id="game-time"><h2><span id="game-time-content"></span></h2></div>
 
-		<div class="row">
-			<div class="col-md-12" style="border:solid; padding:2em; border-radius: 15px">
-				<div class="row" style="">
-				{% for p in persona_names %}
-					<div class="col-md-2 col-sm-2" style="text-align:center; margin-bottom:0.8em;" >
-						<a href="#" id="on_screen_det_trigger-{{p.underscore}}">
-							<div class="row" style="padding:0">
-								<div class="col-md-4" id="on_screen_det_trigger_container-{{p.underscore}}" style="text-align:center; padding:0; padding-top:0.3em">
-									{% with 'assets/characters/profile/'|add:p.underscore|add:'.png' as image_static %}
-									<img src="{% static image_static %}" style="width:46px; padding:0; "> 
-									{% endwith %}
-									<br>
-									{{ p.initial }}
-								</div>
-								<div class="col-md-8" style="padding-top:0.5em; ">
-									<span style="font-size:1.5em" id="quick_emoji-{{p.underscore}}"></span>
-								</div>
-							</div>
-					  </a>
-					</div>
-				{% endfor %}
-				</div>
+			<div class="time-control-buttons" {% if mode == 'simulate' %}style="display: none"{% endif %}>
+				<button id="slower_button" type="button" class="btn btn-default" title="Slow down time"><strong><i class="glyphicon glyphicon-backward"></i></strong></button>
+				<button id="play_button" type="button" class="btn btn-default"><strong><i class="glyphicon glyphicon-play"></i> &nbsp;Play</strong></button>
+				<button id="pause_button" type="button" class="btn btn-default"><strong><i class="glyphicon glyphicon-pause"></i> &nbsp;Pause</strong></button>
+				<button id="faster_button" type="button" class="btn btn-default" title="Speed up time"><strong><i class="glyphicon glyphicon-forward"></i></strong></button>
+				<button id="skip_step_button" type="button" class="btn btn-default" title="Skip to the next simulation step"><strong><i class="glyphicon glyphicon-step-forward"></i></strong></button>
+				<button id="normal_speed_button" type="button" class="btn btn-default" title="Reset playback speed"><strong><i class="glyphicon glyphicon-repeat"></i></strong></button>
+			</div>
+			<div class="speed-readout" {% if mode == 'simulate' %}style="display: none"{% endif %}>Speed: <span id="speed_indicator">1x</span></div>
+
+			<div class="timeline-control" {% if mode == 'simulate' %}style="display: none"{% endif %}>
+				<label for="time_slider">Timeline: step <span id="time_slider_value">{{step}}</span></label>
+				<input id="time_slider" type="range" class="form-control" min="{{step}}" max="{{max_step}}" value="{{step}}" step="1" title="Drag to jump through the replay">
 			</div>
 		</div>
-		<br>
-
-		<div class="media" id="on_screen_det_content-init" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px; ">
-		  <div class="media-left media-middle">
-		    <em>Click on one of the character sprites to see its current state in more detail. </em>
-		  </div>
-		</div>	
-
 
 		{% for p in persona_names %}
-			<div class="media" id="on_screen_det_content-{{p.underscore}}" style="background-color:#EEEEEE; padding:1em; padding-left:3.5em; padding-right:2em; border-radius:10px; display: none;">
+			<div class="media avatar-status-card" id="on_screen_det_content-{{p.underscore}}">
 			  <div class="media-left media-middle">
-			    <a href="#">
+			    <a href="#" id="on_screen_det_trigger-{{p.underscore}}">
 			    	{% with 'assets/characters/profile/'|add:p.underscore|add:'.png' as image_static %}
-						<img src="{% static image_static %}" style="width:5em"> 
-						{% endwith %}
+					<img class="media-object" src="{% static image_static %}">
+					{% endwith %}
 			    </a>
 			  </div>
-			  <div class="media-body" style='padding-left:3em; padding-top:0.5em; padding-bottom:1em'>
-			  	<div class="row">
-			    	<h2 class="col-md-8" id="name__{{ p.underscore }}" style="margin-bottom:0.8em; font-size:1.85em; ">
-			    		{{p.original}} &nbsp;&nbsp;
-			    		<a href="{% url 'replay_persona_state' sim_code step p.underscore %}" style="font-size:0.6em">State Details</a>
-			    	</h2>
-			    </div>
-			    <div style="">
-					  <p style="font-size:1.2em"><strong>Current Action:</strong> <br><span id="current_action__{{ p.underscore }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Location:</strong> <br><span id="target_address__{{ p.underscore }}"></span></p>
-					  <p style="font-size:1.2em"><strong>Current Conversation:</strong> <br><span id="chat__{{ p.underscore }}"></span></p>
-					</div>
+			  <div class="media-body">
+			  	<h2 id="name__{{ p.underscore }}">
+			  		{{p.original}} <span id="quick_emoji-{{p.underscore}}"></span><br>
+			  		<a href="{% url 'replay_persona_state' sim_code step p.underscore %}" style="font-size:0.6em">State Details</a>
+			  	</h2>
+				  <p><strong>Current Action:</strong> <br><span id="current_action__{{ p.underscore }}"></span></p>
+				  <p><strong>Location:</strong> <br><span id="target_address__{{ p.underscore }}"></span></p>
+				  <p><strong>Current Conversation:</strong> <br><span id="chat__{{ p.underscore }}"></span></p>
 			  </div>
-			</div>	
+			</div>
 		{% endfor %}
-
-
 	</div>
 </div>
 
-<div style="margin-top:10em"></div>  
-
-
-<div style="display: " id="temp_focus"></div>
-
-
-
+<div style="display: none" id="temp_focus"></div>
 {% endblock content %}
 
 
@@ -111,45 +64,18 @@
 {% include 'demo/main_script.html' %}
 <script>
 	{% for p in persona_names %}
-		$('#on_screen_det_trigger-{{p.underscore}}').click(function() {
-			$('#on_screen_det_content-init').css({
-		      'display': 'none',
-		    });
-			{% for p_i in persona_names %}
-		    $('#on_screen_det_content-{{p_i.underscore}}').css({
-		      'display': 'none',
-		    });
-		    $('#on_screen_det_trigger-{{p_i.underscore}}').css({
-	      'font-weight': '500',
-		    });
-		    $('#on_screen_det_trigger_container-{{p_i.underscore}}').css({
-		      'background-color': 'white',
-		      'border-radius': '10px'
-		    });
-    	{% endfor %}
-
-    	$('#on_screen_det_trigger-{{p.underscore}}').css({
-	      'font-weight': '900',
-	    });
-	    $('#on_screen_det_trigger_container-{{p.underscore}}').css({
-	      'background-color': '#ABFF84',
-	      'border-radius': '10px'
-	    });
-	    $('#on_screen_det_content-{{p.underscore}}').css({
-	      'display': 'block',
-	    });
-
-	    document.getElementById("temp_focus").innerHTML = "{{p.underscore}}";
-
+		$('#on_screen_det_trigger-{{p.underscore}}').click(function(event) {
+			event.preventDefault();
+			$('.avatar-status-card').css({
+				'border-color': '#ddd',
+				'box-shadow': '0 1px 4px rgba(0, 0, 0, 0.08)'
+			});
+			$('#on_screen_det_content-{{p.underscore}}').css({
+				'border-color': '#7ac943',
+				'box-shadow': '0 0 0 2px rgba(122, 201, 67, 0.35)'
+			});
+			document.getElementById("temp_focus").innerHTML = "{{p.underscore}}";
 		});
 	{% endfor %}
 </script>
 {% endblock js_content %}
-
-
-
-
-
-
-
-

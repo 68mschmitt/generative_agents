@@ -1,19 +1,142 @@
 html,
-body,
-#game-container {
+body {
   margin: 0;
   padding: 0;
+  min-height: 100%;
 }
 
-#game-container {
-  /*min-width: 100vw;
-  min-height: 100vh;*/
+.reverie-layout {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 100vh;
+  width: 100vw;
+  gap: 16px;
+  padding: 16px;
+  box-sizing: border-box;
+  background: #f7f7f7;
 }
 
-#game-container>canvas {
-  border-radius: 5px;
+.reverie-map-pane {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
 }
 
+.reverie-layout #game-container {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  touch-action: none;
+  cursor: grab;
+  background: #111;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.reverie-layout #game-container>canvas {
+  border-radius: 8px;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.reverie-side-pane {
+  flex: 0 0 420px;
+  max-width: 420px;
+  height: 100%;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.time-control-card,
+.avatar-status-card,
+.demo-note-card,
+.avatar-picker-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.time-control-card h3 {
+  margin-top: 0;
+  font-size: 1.2em;
+}
+
+.time-control-card h2 {
+  margin-top: 6px;
+  word-break: break-word;
+}
+
+.time-control-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.time-control-buttons .btn {
+  margin: 0;
+}
+
+.speed-readout {
+  margin-top: 8px;
+  color: #666;
+  font-size: 0.95em;
+}
+
+.timeline-control {
+  margin-top: 14px;
+}
+
+.avatar-status-card {
+  padding: 14px;
+}
+
+.avatar-status-card .media-body {
+  padding-left: 16px !important;
+}
+
+.avatar-status-card h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.35em !important;
+}
+
+.avatar-status-card p {
+  font-size: 1em !important;
+  margin-bottom: 10px;
+}
+
+.avatar-status-card img.media-object,
+.avatar-status-card img {
+  width: 56px !important;
+}
+
+.avatar-picker-card {
+  padding: 12px;
+}
+
+@media (max-width: 900px) {
+  .reverie-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .reverie-map-pane {
+    height: 60vh;
+  }
+
+  .reverie-side-pane {
+    flex: 1 1 auto;
+    max-width: none;
+    width: 100%;
+    height: auto;
+    overflow-y: visible;
+  }
+}

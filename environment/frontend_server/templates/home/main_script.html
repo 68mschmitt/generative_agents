@@ -31,6 +31,7 @@
 	// a step. We use this to link the steps in the backend. 
 	let step = parseInt(document.getElementById('step').innerHTML);
 	let sim_code = document.getElementById('sim_code').innerHTML;
+	let sim_mode = "{{mode}}";
 	// let persona_names = document.getElementById('persona_name_list').innerHTML.split(",");
 
 	let spans = document.getElementById('persona_init_pos').getElementsByTagName('span');
@@ -43,10 +44,11 @@
 
 	// Phaser 3.0 global settings. 
 	// Configuration meant to be passed to the main Phaser game instance. 
+	const game_container = document.getElementById("game-container");
 	const config = {
 	  type: Phaser.AUTO,
-	  width: 1500,
-	  height: 800,
+	  width: game_container.clientWidth,
+	  height: game_container.clientHeight,
 	  parent: "game-container",
 	  pixelArt: true,
 	  physics: {
@@ -77,6 +79,9 @@
 	// Creating the game instance and setting up the main Phaser variables that  
 	// will be used in it. 
 	const game = new Phaser.Game(config);
+	window.addEventListener('resize', function() {
+		game.scale.resize(game_container.clientWidth, game_container.clientHeight);
+	});
 	let cursors;
 	let player;
 	let showDebug = false;
@@ -175,6 +180,130 @@
 	// Important: tile_width % movement_speed has to be 0. 
 	// <movement_speed> determines how fast we move at each upate cylce. 
 	let movement_speed = 32; 
+	const default_movement_speed = movement_speed;
+	const movement_speed_options = [1, 2, 4, 8, 16, 32];
+
+	function refreshSpeedIndicator() {
+		if (speed_indicator) speed_indicator.innerHTML = movement_speed + "x";
+	}
+
+	function setMovementSpeed(new_speed) {
+		let old_execute_count_max = execute_count_max;
+		movement_speed = new_speed;
+		execute_count_max = tile_width / movement_speed;
+		if (old_execute_count_max && execute_count > 0) {
+			execute_count = Math.max(1, Math.ceil(execute_count * execute_count_max / old_execute_count_max));
+		}
+		refreshSpeedIndicator();
+	}
+
+	function adjustMovementSpeed(direction) {
+		let speed_index = movement_speed_options.indexOf(movement_speed);
+		if (speed_index < 0) speed_index = movement_speed_options.indexOf(default_movement_speed);
+		speed_index = Math.min(movement_speed_options.length - 1, Math.max(0, speed_index + direction));
+		setMovementSpeed(movement_speed_options[speed_index]);
+	}
+
+	function moveToward(current, target) {
+		if (current < target) return Math.min(current + movement_speed, target);
+		if (current > target) return Math.max(current - movement_speed, target);
+		return current;
+	}
+
+	function refreshTimeSlider() {
+		if (!time_slider) return;
+		if (step > parseInt(time_slider.max)) time_slider.max = step;
+		time_slider.value = step;
+		if (time_slider_value) time_slider_value.innerHTML = step;
+	}
+
+	function updatePersonaDetailsFromMovement(movement_data) {
+		if (!movement_data || !movement_data["persona"]) return;
+		for (let i=0; i<Object.keys(personas).length; i++) {
+			let curr_persona_name = Object.keys(personas)[i];
+			let curr_persona_name_os = curr_persona_name.replace(/ /g,"_");
+			let persona_movement = movement_data["persona"][curr_persona_name];
+			if (!persona_movement) continue;
+			let description_content = persona_movement["description"] || "@";
+			let chat_content = "";
+			if (persona_movement["chat"] != null) {
+				 for (let j=0; j<persona_movement["chat"].length; j++) {
+					chat_content += persona_movement["chat"][j][0] + ": " + persona_movement["chat"][j][1] + "<br>";
+				}
+			} else {
+				chat_content = "<em>None at the moment</em>";
+			}
+			document.getElementById("current_action__"+curr_persona_name_os).innerHTML = description_content.split("@")[0];
+			document.getElementById("target_address__"+curr_persona_name_os).innerHTML = description_content.split("@")[1] || "";
+			document.getElementById("chat__"+curr_persona_name_os).innerHTML = chat_content;
+		}
+	}
+
+	function applyMovementSnapshot(movement_data) {
+		execute_movement = movement_data;
+		if (movement_data["meta"] && movement_data["meta"]["curr_time"]) {
+			document.getElementById("game-time-content").innerHTML = movement_data["meta"]["curr_time"];
+		}
+		for (let i=0; i<Object.keys(personas).length; i++) {
+			let curr_persona_name = Object.keys(personas)[i];
+			let persona_movement = movement_data["persona"][curr_persona_name];
+			if (!persona_movement) continue;
+			let curr_persona = personas[curr_persona_name];
+			let curr_x = persona_movement["movement"][0] * tile_width;
+			let curr_y = persona_movement["movement"][1] * tile_width;
+			curr_persona.body.x = curr_x;
+			curr_persona.body.y = curr_y;
+			movement_target[curr_persona_name] = [curr_x, curr_y];
+			pronunciatios[curr_persona_name].x = curr_x - 6;
+			pronunciatios[curr_persona_name].y = curr_y - 42 - 32;
+			curr_persona.anims.stop();
+
+			let pronunciatio_content = persona_movement["pronunciatio"];
+			let rgx = new RegExp(/(\p{L}{1})\p{L}+/, 'gu');
+			let initials = [...curr_persona_name.matchAll(rgx)] || [];
+			initials = ((initials.shift()?.[1] || '') + (initials.pop()?.[1] || '')).toUpperCase();
+			pronunciatios[curr_persona_name].setText(initials + ": " + pronunciatio_content);
+		}
+		updatePersonaDetailsFromMovement(movement_data);
+	}
+
+	function seekToStep(target_step, play_context) {
+		if (sim_mode != "replay") return;
+		play_context.scene.pause();
+		var seek_xobj = new XMLHttpRequest();
+		seek_xobj.overrideMimeType("application/json");
+		seek_xobj.open('POST', "{% url 'update_environment' %}", true);
+		seek_xobj.addEventListener("load", function() {
+			if (this.readyState === 4 && seek_xobj.status === 200) {
+				let movement_data = JSON.parse(seek_xobj.responseText);
+				if (movement_data["<step>"] == target_step) {
+					step = target_step;
+					phase = "update";
+					execute_count = execute_count_max;
+					applyMovementSnapshot(movement_data);
+					refreshTimeSlider();
+				}
+			}
+		});
+		seek_xobj.send(JSON.stringify({"step": target_step, "sim_code": sim_code }));
+	}
+
+	function setupTimeControls(play_context) {
+		play_button.onclick = function(){ play_context.scene.resume(); };
+		pause_button.onclick = function(){ play_context.scene.pause(); };
+		slower_button.onclick = function(){ adjustMovementSpeed(-1); };
+		faster_button.onclick = function(){ adjustMovementSpeed(1); };
+		normal_speed_button.onclick = function(){ setMovementSpeed(default_movement_speed); };
+		skip_step_button.onclick = function(){
+			if (execute_count < execute_count_max) execute_count = Math.min(execute_count, 1);
+		};
+		if (time_slider && sim_mode == "replay") {
+			time_slider.oninput = function(){ time_slider_value.innerHTML = this.value; };
+			time_slider.onchange = function(){ seekToStep(parseInt(this.value), play_context); };
+		}
+		refreshSpeedIndicator();
+		refreshTimeSlider();
+	}
 
 	// <timer_max> determines how frequently our update function will query the 
 	// frontend server. If it's higher, we wait longer cycles. 
@@ -246,9 +375,15 @@
 	  // see: https://labs.phaser.io/view.html?src=src/animation/single%20sprite%20sheet.js
 	  // Joon: Technically, I think this guy had the best tutorial for atlas: 
 	  //       https://www.youtube.com/watch?v=fdXcD9X4NrQ&ab_channel=MorganPage
-	  this.load.atlas("atlas", 
-	                  "https://mikewesthad.github.io/phaser-3-tilemap-blog-posts/post-1/assets/atlas/atlas.png", 
-	                  "https://mikewesthad.github.io/phaser-3-tilemap-blog-posts/post-1/assets/atlas/atlas.json");
+	  this.load.atlas("atlas", "{% static 'assets/characters/Yuriko_Yamamoto.png' %}", 
+	                  "{% static 'assets/characters/atlas.json' %}");
+
+	  {% for p_name, p_name_os in persona_names %}
+	    {% with 'assets/characters/'|add:p_name_os|add:'.png' as image_static %}
+	      this.load.atlas("{{p_name_os}}", "{% static image_static %}",
+	                      "{% static 'assets/characters/atlas.json' %}");
+	    {% endwith %}
+	  {% endfor %}
 	}
 
 	function create() {  
@@ -335,7 +470,7 @@
 	  // The image  used for the sprite has a bit of whitespace, so I'm using 
 	  // setSize & setOffset to control the size of the player's body.
 	  player = this.physics.add.
-	                sprite(800, 288, "atlas", "misa-front").
+	                sprite(800, 288, "atlas", "down").
 	                setSize(30, 40).
 	                setOffset(0, 0);
 	  player.setDepth(-1);
@@ -347,6 +482,7 @@
 	  // Mouse wheel zooms; click-and-drag pans by moving the camera target.
 	  setupCameraControls(this, camera, map, 0.25);
 	  cursors = this.input.keyboard.createCursorKeys();
+	  setupTimeControls(this);
 
 	  // *** SET UP PERSONAS *** 
 	  // We start by creating the game sprite objects. 
@@ -354,10 +490,13 @@
 	    let persona_name = Object.keys(spawn_tile_loc)[i];
 	    let start_pos = [spawn_tile_loc[persona_name][0] * tile_width + tile_width / 2, 
 	                     spawn_tile_loc[persona_name][1] * tile_width + tile_width];
+	    let persona_texture = persona_name.replace(/ /g,"_");
 	    let new_sprite = this.physics.add
-	                         .sprite(start_pos[0], start_pos[1], "atlas", "misa-front")
+	                         .sprite(start_pos[0], start_pos[1], persona_texture, "down")
 	                         .setSize(30, 40)
-	                         .setOffset(0, 32); // DEBUG 1 --- I added 32 offset on Dec 29. 
+	                         .setOffset(0, 0);
+	    new_sprite.displayWidth = 40;
+	    new_sprite.scaleY = new_sprite.scaleX;
 	    // Here, we are creating the persona and its pronunciatio sprites.
 	    personas[persona_name] = new_sprite;
 	    pronunciatios[persona_name] = this.add.text(
@@ -375,48 +514,37 @@
 	  // Create the player's walking animations from the texture atlas. These are
 	  // stored in the global animation manager so any sprite can access them.
 	  const anims = this.anims;
-	  anims.create({
-	    key: "misa-left-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-left-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+	  for (let i=0; i<Object.keys(spawn_tile_loc).length; i++) {
+	    let persona_name = Object.keys(spawn_tile_loc)[i];
+	    let persona_texture = persona_name.replace(/ /g,"_");
+	    anims.create({
+	      key: persona_name + "-left-walk",
+	      frames: anims.generateFrameNames(persona_texture, { prefix: "left-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-right-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-right-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+	    anims.create({
+	      key: persona_name + "-right-walk",
+	      frames: anims.generateFrameNames(persona_texture, { prefix: "right-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-front-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-front-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+	    anims.create({
+	      key: persona_name + "-down-walk",
+	      frames: anims.generateFrameNames(persona_texture, { prefix: "down-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
 
-	  anims.create({
-	    key: "misa-back-walk",
-	    frames: anims.generateFrameNames("atlas", { prefix: "misa-back-walk.", start: 0, end: 3, zeroPad: 3 }),
-	    frameRate: 4,
-	    repeat: -1 });
+	    anims.create({
+	      key: persona_name + "-up-walk",
+	      frames: anims.generateFrameNames(persona_texture, { prefix: "up-walk.", start: 0, end: 3, zeroPad: 3 }),
+	      frameRate: 4,
+	      repeat: -1 });
+	  }
 	}
 
 
 	function update(time, delta) {
-		// *** SETUP PLAY AND PAUSE BUTTON *** 
-		let play_context = this;
-		function game_resume() {  
-			play_context.scene.resume();
-		}  
-		play_button.onclick = function(){
-			game_resume();
-		};
-		function game_pause() {  
-			play_context.scene.pause();
-		}  
-		pause_button.onclick = function(){
-			game_pause();
-		};
-
 	  // *** MOVE CAMERA *** 
 	  // This is where we finish up the camera setting we started in the create() 
 	  // function. We set the movement speed of the camera and wire up the keys to
@@ -529,22 +657,22 @@
 	      console.log(curr_persona_name);
 	      if (execute_count > 0) {
 	        if (curr_persona.body.x < movement_target[curr_persona_name][0]) {
-	          curr_persona.body.x += movement_speed; 
+	          curr_persona.body.x = moveToward(curr_persona.body.x, movement_target[curr_persona_name][0]); 
 	          anims_direction = "r";
 	          pre_anims_direction = "r"
 	          pre_anims_direction_dict[curr_persona_name] = "r"
 	        } else if (curr_persona.body.x > movement_target[curr_persona_name][0]) {
-	          curr_persona.body.x -= movement_speed; 
+	          curr_persona.body.x = moveToward(curr_persona.body.x, movement_target[curr_persona_name][0]); 
 	          anims_direction = "l";
 	          pre_anims_direction = "l"
 	          pre_anims_direction_dict[curr_persona_name] = "l"
 	        } else if (curr_persona.body.y < movement_target[curr_persona_name][1]) {
-	          curr_persona.body.y += movement_speed;
+	          curr_persona.body.y = moveToward(curr_persona.body.y, movement_target[curr_persona_name][1]);
 	          anims_direction = "d";
 	          pre_anims_direction = "d"
 	          pre_anims_direction_dict[curr_persona_name] = "d"
 	        } else if (curr_persona.body.y > movement_target[curr_persona_name][1]) {
-	          curr_persona.body.y -= movement_speed;
+	          curr_persona.body.y = moveToward(curr_persona.body.y, movement_target[curr_persona_name][1]);
 	          anims_direction = "u";
 	          pre_anims_direction = "u"
 	          pre_anims_direction_dict[curr_persona_name] = "u"
@@ -555,22 +683,23 @@
 	        curr_pronunciatio.x = curr_persona.body.x - 6; 
           curr_pronunciatio.y = curr_persona.body.y - 42 - 32; // DEBUG 1 --- I added 32 offset on Dec 29. 
 
+          let curr_persona_texture = curr_persona_name.replace(/ /g,"_");
           if (anims_direction == "l") {
-			      curr_persona.anims.play("misa-left-walk", true);
+			      curr_persona.anims.play(curr_persona_name + "-left-walk", true);
 			    } else if (anims_direction == "r") {
-			      curr_persona.anims.play("misa-right-walk", true);
+			      curr_persona.anims.play(curr_persona_name + "-right-walk", true);
 			    } else if (anims_direction == "u") {
-			      curr_persona.anims.play("misa-back-walk", true);
+			      curr_persona.anims.play(curr_persona_name + "-up-walk", true);
 			    } else if (anims_direction == "d") {
-			      curr_persona.anims.play("misa-front-walk", true);
+			      curr_persona.anims.play(curr_persona_name + "-down-walk", true);
 			    } else {
 			      curr_persona.anims.stop();
 
 			      // If we were moving, pick an idle frame to use
-			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture("atlas", "misa-left");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture("atlas", "misa-right");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture("atlas", "misa-back");else
-			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture("atlas", "misa-front");
+			      if (pre_anims_direction_dict[curr_persona_name] == "l") curr_persona.setTexture(curr_persona_texture, "left");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "r") curr_persona.setTexture(curr_persona_texture, "right");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "u") curr_persona.setTexture(curr_persona_texture, "up");else
+			      if (pre_anims_direction_dict[curr_persona_name] == "d") curr_persona.setTexture(curr_persona_texture, "down");
 			    };
 
 	      } 
@@ -587,6 +716,7 @@
 	        phase = "process";
 	        execute_count = execute_count_max + 1;
 	        step = step + 1;
+	        refreshTimeSlider();
 	      }
 	    }
 
@@ -622,6 +752,13 @@
 	// Control button binders
 	var play_button=document.getElementById("play_button");
 	var pause_button=document.getElementById("pause_button");
+	var slower_button=document.getElementById("slower_button");
+	var faster_button=document.getElementById("faster_button");
+	var normal_speed_button=document.getElementById("normal_speed_button");
+	var skip_step_button=document.getElementById("skip_step_button");
+	var speed_indicator=document.getElementById("speed_indicator");
+	var time_slider=document.getElementById("time_slider");
+	var time_slider_value=document.getElementById("time_slider_value");
 </script>
 
 

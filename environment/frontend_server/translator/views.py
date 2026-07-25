@@ -86,6 +86,7 @@ def demo(request, sim_code, step, play_speed="2"):
 
   context = {"sim_code": sim_code,
              "step": step,
+             "max_step": max([int(i) for i in raw_all_movement.keys()]),
              "persona_names": persona_names,
              "persona_init_pos": json.dumps(persona_init_pos), 
              "all_movement": json.dumps(all_movement), 
@@ -145,7 +146,8 @@ def home(request):
         persona_init_pos += [[key, val["x"], val["y"]]]
 
   context = {"sim_code": sim_code,
-             "step": step, 
+             "step": step,
+             "max_step": max(file_count),
              "persona_names": persona_names,
              "persona_init_pos": persona_init_pos,
              "mode": "simulate"}
@@ -180,6 +182,7 @@ def replay(request, sim_code, step):
 
   context = {"sim_code": sim_code,
              "step": step,
+             "max_step": max(file_count),
              "persona_names": persona_names,
              "persona_init_pos": persona_init_pos, 
              "mode": "replay"}
